@@ -30,67 +30,74 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Create Flutter Android project structure
+      - name: Generate Android project and configure
         run: |
-          # Sauvegarder les fichiers Dart
+          # Sauvegarder nos fichiers
           cp -r lib lib_backup
           cp pubspec.yaml pubspec_backup.yaml
           
           # Générer le projet Flutter complet
           flutter create --org com.dubuc --project-name dubuc_app .
           
-          # Restaurer nos fichiers Dart
+          # Restaurer nos fichiers
           rm -rf lib
           mv lib_backup lib
           mv pubspec_backup.yaml pubspec.yaml
 
-      - name: Fix Kotlin version conflicts
-        run: |
-          # Ajouter la résolution des conflits Kotlin dans android/build.gradle
-          cat >> android/build.gradle << 'GRADLEOF'
-          
-          subprojects {
-              afterEvaluate { project ->
-                  if (project.hasProperty('android')) {
-                      project.android {
-                          if (namespace == null) {
-                              namespace project.group
-                          }
-                      }
-                  }
-              }
-              project.configurations.all {
-                  resolutionStrategy.eachDependency { details ->
-                      if (details.requested.group == 'org.jetbrains.kotlin' 
-                          && details.requested.name.startsWith('kotlin-stdlib')) {
-                          details.useVersion '1.8.22'
-                      }
+          # === 1. Fix minSdkVersion (requis par mobile_scanner) ===
+          sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
+
+          # === 2. Fix Kotlin conflicts dans app/build.gradle ===
+          cat >> android/app/build.gradle << 'EOF'
+
+          configurations.all {
+              resolutionStrategy.eachDependency { details ->
+                  if (details.requested.group == 'org.jetbrains.kotlin') {
+                      details.useVersion '1.8.22'
                   }
               }
           }
-          GRADLEOF
-          
-          echo "=== android/build.gradle (fin) ==="
-          tail -20 android/build.gradle
+          EOF
 
-      - name: Update Android configuration
-        run: |
-          # Mettre minSdkVersion à 21 (requis par mobile_scanner)
-          sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle
-          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
-          
-          # Ajouter les permissions caméra et internet au manifest
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.CAMERA" />' android/app/src/main/AndroidManifest.xml
-          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
-          sed -i '/<manifest/a\    <uses-feature android:name="android.hardware.camera" android:required="true" />' android/app/src/main/AndroidManifest.xml
-          
-          # Changer le nom de l'app et activer cleartext traffic (HTTP)
-          sed -i 's/android:label="[^"]*"/android:label="Dubuc App"/' android/app/src/main/AndroidManifest.xml
-          sed -i 's/<application/<application android:usesCleartextTraffic="true" /' android/app/src/main/AndroidManifest.xml
-          
-          echo "=== Vérifications ==="
-          grep -i "minSdk" android/app/build.gradle || true
-          grep -i "CAMERA\|INTERNET" android/app/src/main/AndroidManifest.xml || true
+          # === 3. Permissions et config AndroidManifest ===
+          cat > android/app/src/main/AndroidManifest.xml << 'MANIFEST'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-feature android:name="android.hardware.camera" android:required="true" />
+              <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+              <application
+                  android:label="Dubuc App"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:taskAffinity=""
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme" />
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+          </manifest>
+          MANIFEST
+
+          echo "=== DONE: Android project configured ==="
           
       - name: Get dependencies
         run: flutter pub get
