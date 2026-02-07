@@ -44,15 +44,24 @@ jobs:
           mv lib_backup lib
           mv pubspec_backup.yaml pubspec.yaml
           
-      - name: Update Android permissions
+      - name: Update Android configuration
         run: |
+          # Mettre minSdkVersion à 21 (requis par mobile_scanner)
+          sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
+          
           # Ajouter les permissions caméra et internet au manifest
-          sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' android/app/src/main/AndroidManifest.xml
-          sed -i '/<application/i\    <uses-permission android:name="android.permission.CAMERA" \/>\n    <uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-feature android:name="android.hardware.camera" android:required="true" \/>' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.CAMERA" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest/a\    <uses-permission android:name="android.permission.INTERNET" />' android/app/src/main/AndroidManifest.xml
+          sed -i '/<manifest/a\    <uses-feature android:name="android.hardware.camera" android:required="true" />' android/app/src/main/AndroidManifest.xml
+          
+          # Changer le nom de l'app et activer cleartext traffic (HTTP)
           sed -i 's/android:label="[^"]*"/android:label="Dubuc App"/' android/app/src/main/AndroidManifest.xml
-          sed -i 's/android:usesCleartextTraffic="[^"]*"/android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
-          # Si usesCleartextTraffic n'existe pas, l'ajouter
-          grep -q "usesCleartextTraffic" android/app/src/main/AndroidManifest.xml || sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:usesCleartextTraffic="true" /' android/app/src/main/AndroidManifest.xml
+          
+          echo "=== AndroidManifest.xml ==="
+          head -20 android/app/src/main/AndroidManifest.xml
+          echo "=== build.gradle minSdk ==="
+          grep -i "minSdk" android/app/build.gradle
           
       - name: Get dependencies
         run: flutter pub get
