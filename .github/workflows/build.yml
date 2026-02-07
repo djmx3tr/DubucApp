@@ -26,17 +26,41 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0'
+          flutter-version: '3.19.0'
           channel: 'stable'
           cache: true
 
+      - name: Create Flutter Android project structure
+        run: |
+          # Sauvegarder les fichiers Dart
+          cp -r lib lib_backup
+          cp pubspec.yaml pubspec_backup.yaml
+          
+          # Générer le projet Flutter complet
+          flutter create --org com.dubuc --project-name dubuc_app .
+          
+          # Restaurer nos fichiers Dart
+          rm -rf lib
+          mv lib_backup lib
+          mv pubspec_backup.yaml pubspec.yaml
+          
+      - name: Update Android permissions
+        run: |
+          # Ajouter les permissions caméra et internet au manifest
+          sed -i 's/<manifest/<manifest xmlns:tools="http:\/\/schemas.android.com\/tools"/' android/app/src/main/AndroidManifest.xml
+          sed -i '/<application/i\    <uses-permission android:name="android.permission.CAMERA" \/>\n    <uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-feature android:name="android.hardware.camera" android:required="true" \/>' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:label="[^"]*"/android:label="Dubuc App"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:usesCleartextTraffic="[^"]*"/android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          # Si usesCleartextTraffic n'existe pas, l'ajouter
+          grep -q "usesCleartextTraffic" android/app/src/main/AndroidManifest.xml || sed -i 's/<application/<application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          
       - name: Get dependencies
         run: flutter pub get
 
       - name: Build APK (Release)
         run: flutter build apk --release
 
-      - name: Build APK (Debug)
+      - name: Build APK (Debug)  
         run: flutter build apk --debug
 
       - name: Upload Release APK
