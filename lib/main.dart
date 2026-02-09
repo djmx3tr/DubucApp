@@ -7,15 +7,13 @@ import 'screens/scanner_screen.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialiser les notifications et le service de surveillance
-  await initNotificationService();
-
+void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ApiService(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ApiService()),
+        ChangeNotifierProvider(create: (_) => AlertService()),
+      ],
       child: const DubucApp(),
     ),
   );
@@ -74,35 +72,47 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+      bottomNavigationBar: Consumer<AlertService>(
+        builder: (context, alertService, child) {
+          return NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (index) {
+              setState(() {
+                _selectedIndex = index;
+              });
+            },
+            destinations: [
+              const NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: 'Accueil',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.qr_code_scanner_outlined),
+                selectedIcon: Icon(Icons.qr_code_scanner),
+                label: 'Scanner',
+              ),
+              NavigationDestination(
+                icon: Badge(
+                  isLabelVisible: alertService.unreadCount > 0,
+                  label: Text('${alertService.unreadCount}'),
+                  child: const Icon(Icons.notifications_outlined),
+                ),
+                selectedIcon: Badge(
+                  isLabelVisible: alertService.unreadCount > 0,
+                  label: Text('${alertService.unreadCount}'),
+                  child: const Icon(Icons.notifications),
+                ),
+                label: 'Alertes',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
+                label: 'Paramètres',
+              ),
+            ],
+          );
         },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Accueil',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.qr_code_scanner_outlined),
-            selectedIcon: Icon(Icons.qr_code_scanner),
-            label: 'Scanner',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.notifications_outlined),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'Alertes',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Paramètres',
-          ),
-        ],
       ),
     );
   }

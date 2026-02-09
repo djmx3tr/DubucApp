@@ -1,163 +1,135 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_background_service_android/flutter_background_service_android.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Constantes
-const int _pollIntervalSeconds = 5;
-const String _notificationChannelId = 'dubuc_alerts';
-const String _foregroundChannelId = 'dubuc_foreground';
+/// Service d'alertes - polling actif quand l'app est ouverte
+class AlertService extends ChangeNotifier {
+  static const int _pollIntervalSeconds = 5;
+  static const String _alertUrlKey = 'alert_server_url';
+  static const String _defaultAlertUrl = 'http://192.168.0.24:5001';
 
-// Instance globale des notifications
-final FlutterLocalNotificationsPlugin _notificationsPlugin =
-    FlutterLocalNotificationsPlugin();
+  Timer? _timer;
+  List<Map<String, dynamic>> _alerts = [];
+  int _unreadCount = 0;
+  bool _isEnabled = true;
+  String _alertServerUrl = _defaultAlertUrl;
 
-/// Initialise tout le système de notifications + service background
-Future<void> initNotificationService() async {
-  // 1. Notifications locales
-  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initSettings = InitializationSettings(android: androidSettings);
-  await _notificationsPlugin.initialize(initSettings);
+  List<Map<String, dynamic>> get alerts => _alerts;
+  int get unreadCount => _unreadCount;
+  bool get isEnabled => _isEnabled;
+  String get alertServerUrl => _alertServerUrl;
 
-  // 2. Service en arrière-plan
-  final service = FlutterBackgroundService();
-
-  await service.configure(
-    iosConfiguration: IosConfiguration(),
-    androidConfiguration: AndroidConfiguration(
-      onStart: _onServiceStart,
-      autoStart: true,
-      isForegroundMode: true,
-      autoStartOnBoot: true,
-      notificationChannelId: _foregroundChannelId,
-      initialNotificationTitle: 'Dubuc & CO',
-      initialNotificationContent: 'Surveillance des alertes active',
-      foregroundServiceNotificationId: 888,
-    ),
-  );
-
-  await service.startService();
-}
-
-/// Point d'entrée du service background
-@pragma('vm:entry-point')
-Future<void> _onServiceStart(ServiceInstance service) async {
-  DartPluginRegistrant.ensureInitialized();
-
-  // Initialiser les notifications dans le service
-  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initSettings = InitializationSettings(android: androidSettings);
-  await _notificationsPlugin.initialize(initSettings);
-
-  if (service is AndroidServiceInstance) {
-    service.on('setAsForeground').listen((_) {
-      service.setAsForegroundService();
-    });
-    service.on('setAsBackground').listen((_) {
-      service.setAsBackgroundService();
-    });
+  AlertService() {
+    _loadSettings();
   }
 
-  service.on('stopService').listen((_) {
-    service.stopSelf();
-  });
-
-  // Boucle de vérification toutes les 30 secondes
-  Timer.periodic(const Duration(seconds: _pollIntervalSeconds), (_) async {
-    await _checkForAlerts(service);
-  });
-
-  // Première vérification immédiate
-  await _checkForAlerts(service);
-}
-
-/// Vérifie les alertes depuis le serveur
-Future<void> _checkForAlerts(ServiceInstance service) async {
-  try {
+  Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool('alerts_enabled') ?? true;
-    if (!enabled) return;
-
-    final alertServerUrl =
-        prefs.getString('alert_server_url') ?? 'http://192.168.0.24:5001';
-    final lastAlertId = prefs.getInt('last_alert_id') ?? 0;
-
-    final response = await http
-        .get(Uri.parse('$alertServerUrl/api/alerts'))
-        .timeout(const Duration(seconds: 10));
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final alerts = data['alerts'] as List<dynamic>? ?? [];
-      int maxId = lastAlertId;
-
-      for (final alert in alerts) {
-        final alertId = alert['id'] as int? ?? 0;
-        if (alertId > lastAlertId) {
-          final machine = alert['machine_id'] ?? 'Inconnu';
-          final message = alert['message'] ?? 'Alerte détection';
-          final count = alert['consecutive_count'] ?? 0;
-
-          // Notification push
-          await _showAlertNotification(
-            'Code-barres manquant [$machine]',
-            '$message ($count feuilles consécutives)',
-            alertId,
-          );
-
-          if (alertId > maxId) maxId = alertId;
-        }
-      }
-
-      if (maxId > lastAlertId) {
-        await prefs.setInt('last_alert_id', maxId);
-      }
-
-      // Mettre à jour la notification du foreground service
-      if (service is AndroidServiceInstance) {
-        final unreadCount = alerts.length;
-        service.setForegroundNotificationInfo(
-          title: 'Dubuc & CO',
-          content: unreadCount > 0
-              ? '$unreadCount alerte(s) non lue(s)'
-              : 'Surveillance active - Aucune alerte',
-        );
-      }
+    _alertServerUrl = prefs.getString(_alertUrlKey) ?? _defaultAlertUrl;
+    _isEnabled = prefs.getBool('alerts_enabled') ?? true;
+    if (_isEnabled) {
+      startPolling();
     }
-  } catch (e) {
-    debugPrint('Erreur vérification alertes: $e');
+    notifyListeners();
   }
-}
 
-/// Affiche une notification d'alerte
-Future<void> _showAlertNotification(String title, String body, int id) async {
-  const androidDetails = AndroidNotificationDetails(
-    _notificationChannelId,
-    'Alertes Dubuc',
-    channelDescription: 'Alertes de détection code-barres manquant',
-    importance: Importance.high,
-    priority: Priority.high,
-    playSound: true,
-    enableVibration: true,
-    icon: '@mipmap/ic_launcher',
-  );
-  const details = NotificationDetails(android: androidDetails);
-  await _notificationsPlugin.show(id, title, body, details);
-}
+  Future<void> setAlertServerUrl(String url) async {
+    _alertServerUrl = url;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_alertUrlKey, url);
+    notifyListeners();
+  }
 
-/// Arrête le service
-Future<void> stopAlertService() async {
-  final service = FlutterBackgroundService();
-  service.invoke('stopService');
-}
+  Future<void> setEnabled(bool enabled) async {
+    _isEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('alerts_enabled', enabled);
+    if (enabled) {
+      startPolling();
+    } else {
+      stopPolling();
+    }
+    notifyListeners();
+  }
 
-/// Démarre le service
-Future<void> startAlertService() async {
-  final service = FlutterBackgroundService();
-  await service.startService();
+  void startPolling() {
+    _timer?.cancel();
+    _timer = Timer.periodic(
+      const Duration(seconds: _pollIntervalSeconds),
+      (_) => fetchAlerts(),
+    );
+    // Première vérification immédiate
+    fetchAlerts();
+  }
+
+  void stopPolling() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  Future<void> fetchAlerts() async {
+    if (!_isEnabled) return;
+
+    try {
+      final response = await http
+          .get(Uri.parse('$_alertServerUrl/api/alerts'))
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _alerts = (data['alerts'] as List<dynamic>? ?? [])
+            .map((a) => Map<String, dynamic>.from(a))
+            .toList();
+        _unreadCount = _alerts.length;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Erreur polling alertes: $e');
+    }
+  }
+
+  Future<void> acknowledgeAll() async {
+    try {
+      await http.post(
+        Uri.parse('$_alertServerUrl/api/alerts/acknowledge'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'ids': []}),
+      ).timeout(const Duration(seconds: 5));
+      await fetchAlerts();
+    } catch (e) {
+      debugPrint('Erreur acquittement: $e');
+    }
+  }
+
+  Future<void> acknowledgeOne(int alertId) async {
+    try {
+      await http.post(
+        Uri.parse('$_alertServerUrl/api/alerts/acknowledge'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'ids': [alertId]}),
+      ).timeout(const Duration(seconds: 5));
+      await fetchAlerts();
+    } catch (e) {
+      debugPrint('Erreur acquittement: $e');
+    }
+  }
+
+  Future<bool> testConnection() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$_alertServerUrl/api/alerts/count'))
+          .timeout(const Duration(seconds: 5));
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 }
