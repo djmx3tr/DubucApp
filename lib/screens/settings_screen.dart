@@ -254,7 +254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Notification push toutes les 30 secondes si code-barres manquant (2 feuilles consécutives)',
+              'Vérifie toutes les 5 secondes. Alerte si 2+ feuilles consécutives sans code-barres.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),

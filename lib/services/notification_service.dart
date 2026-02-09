@@ -9,7 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Constantes
-const int _pollIntervalSeconds = 30;
+const int _pollIntervalSeconds = 5;
 const String _notificationChannelId = 'dubuc_alerts';
 const String _foregroundChannelId = 'dubuc_foreground';
 
