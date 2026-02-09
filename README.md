@@ -21,7 +21,7 @@ Application mobile pour la gestion des jobs de l'usine Dubuc & CO.
 
 - Flutter SDK 3.0+
 - Android SDK
-- Serveur API Dubuc (par défaut: `http://192.168.0.24:5000`)
+- Serveur API Dubuc
 
 ## Installation (Développement)
 
