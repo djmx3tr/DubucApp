@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
+import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/scanner_screen.dart';
-import 'screens/job_detail_screen.dart';
+import 'screens/alerts_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialiser les notifications et le service de surveillance
+  await initNotificationService();
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => ApiService(),
@@ -60,6 +66,7 @@ class _MainNavigationState extends State<MainNavigation> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const ScannerScreen(),
+    const AlertsScreen(),
     const SettingsScreen(),
   ];
 
@@ -84,6 +91,11 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.qr_code_scanner_outlined),
             selectedIcon: Icon(Icons.qr_code_scanner),
             label: 'Scanner',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.notifications_outlined),
+            selectedIcon: Icon(Icons.notifications),
+            label: 'Alertes',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
