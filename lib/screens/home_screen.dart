@@ -12,33 +12,14 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<CurrentJob> _currentJobs = [];
-  bool _isLoading = true;
   final TextEditingController _searchController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadJobs();
-  }
-
-  Future<void> _loadJobs() async {
-    setState(() => _isLoading = true);
-    
-    final api = context.read<ApiService>();
-    final jobs = await api.getCurrentJobs();
-    
-    if (mounted) {
-      setState(() {
-        _currentJobs = jobs;
-        _isLoading = false;
-      });
-    }
-  }
+  bool _isSearching = false;
 
   Future<void> _searchJob() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
+
+    setState(() => _isSearching = true);
 
     final api = context.read<ApiService>();
     Job? job;
@@ -57,6 +38,8 @@ class _HomeScreenState extends State<HomeScreen> {
         job = await api.getJob(jobId);
       }
     }
+
+    setState(() => _isSearching = false);
 
     if (job != null && mounted) {
       Navigator.push(
@@ -86,161 +69,149 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dubuc & CO'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadJobs,
-            tooltip: 'Actualiser',
-          ),
-        ],
       ),
-      body: Column(
-        children: [
-          // Barre de recherche
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+
+              // Icône principale
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(24),
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Job (154595) ou Palette (DAN-...)',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Theme.of(context).colorScheme.surfaceVariant,
-                    ),
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _searchJob(),
+                child: Icon(
+                  Icons.work_outline,
+                  size: 48,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              Text(
+                'Info Job',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                'Entrez un numéro de job ou de palette',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Barre de recherche
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Job (154595) ou Palette (DAN-...)',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceVariant,
+                ),
+                keyboardType: TextInputType.text,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _searchJob(),
+                style: const TextStyle(fontSize: 18),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Bouton chercher
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: _isSearching ? null : _searchJob,
+                  icon: _isSearching
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.search),
+                  label: Text(
+                    _isSearching ? 'Recherche...' : 'Chercher',
+                    style: const TextStyle(fontSize: 16),
                   ),
                 ),
-                const SizedBox(width: 12),
-                FilledButton(
-                  onPressed: _searchJob,
-                  child: const Text('Chercher'),
-                ),
-              ],
-            ),
-          ),
+              ),
 
-          // Liste des jobs en cours
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _currentJobs.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.inbox_outlined,
-                              size: 64,
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Aucun job en cours',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.outline,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextButton.icon(
-                              onPressed: _loadJobs,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Actualiser'),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadJobs,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _currentJobs.length,
-                          itemBuilder: (context, index) {
-                            final job = _currentJobs[index];
-                            return _JobCard(
-                              job: job,
-                              onTap: () async {
-                                final api = context.read<ApiService>();
-                                final jobId = int.tryParse(job.jobNumber);
-                                if (jobId != null) {
-                                  final fullJob = await api.getJob(jobId);
-                                  if (fullJob != null && mounted) {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => JobDetailScreen(job: fullJob),
-                                      ),
-                                    );
-                                  }
-                                }
-                              },
-                            );
-                          },
+              const SizedBox(height: 48),
+
+              // Section aide
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Types de codes supportés',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _JobCard extends StatelessWidget {
-  final CurrentJob job;
-  final VoidCallback onTap;
-
-  const _JobCard({
-    required this.job,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Icon(
-              Icons.work_outline,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(Icons.work_outline,
+                              size: 20,
+                              color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 8),
+                          const Text('Job : 6 chiffres (ex: 154595)'),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.inventory_2_outlined,
+                              size: 20,
+                              color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: 8),
+                          const Text('Palette : 3 lettres + tiret (ex: DAN-12345)'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Icon(Icons.qr_code_scanner,
+                              size: 20,
+                              color: Theme.of(context).colorScheme.tertiary),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Utilisez le scanner pour lire un code-barres',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.tertiary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        title: Text(
-          'Job #${job.jobNumber}',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: job.line != null
-            ? Text('Ligne ${ job.line}')
-            : null,
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
       ),
     );
   }

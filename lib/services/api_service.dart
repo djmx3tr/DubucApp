@@ -6,7 +6,7 @@ import '../models/job.dart';
 
 class ApiService extends ChangeNotifier {
   static const String _serverUrlKey = 'server_url';
-  static const String _defaultServerUrl = 'http://192.168.0.24:5000';
+  static const String _defaultServerUrl = 'http://192.168.0.24:8000';
   
   String _serverUrl = _defaultServerUrl;
   bool _isLoading = false;
@@ -156,11 +156,11 @@ class ApiService extends ChangeNotifier {
     }
   }
 
-  /// Test de connexion au serveur
+  /// Test de connexion au serveur (utilise /job qui ne dépend pas de Compteurs_data)
   Future<bool> testConnection() async {
     try {
       final response = await http.get(
-        Uri.parse('$_serverUrl/api/jobs/current'),
+        Uri.parse('$_serverUrl/job'),
       ).timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (e) {
