@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
-import 'services/notification_service.dart';
 import 'services/unified_notification_service.dart';
+import 'services/background_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'screens/alerts_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeBackgroundService();
   runApp(
     MultiProvider(
       providers: [
@@ -78,39 +80,14 @@ class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObse
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Déconnecter WebSocket proprement
-    context.read<UnifiedNotificationService>().disconnectWebSocket();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
-    final notificationService = context.read<UnifiedNotificationService>();
-    
-    switch (state) {
-      case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
-        // App en background ou fermée - déconnecter WebSocket
-        notificationService.disconnectWebSocket();
-        debugPrint('App en background - WebSocket déconnecté');
-        break;
-        
-      case AppLifecycleState.resumed:
-      case AppLifecycleState.inactive:
-        // App active ou en avant-plan - reconnecter si nécessaire
-        if (!notificationService.isWebSocketConnected) {
-          notificationService.reconnectWebSocket();
-          debugPrint('App active - WebSocket reconnexion');
-        }
-        break;
-        
-      case AppLifecycleState.hidden:
-        // App cachée - déconnecter pour économiser la batterie
-        notificationService.disconnectWebSocket();
-        debugPrint('App cachée - WebSocket déconnecté');
-        break;
+    if (state == AppLifecycleState.resumed) {
+      context.read<UnifiedNotificationService>().refresh();
     }
   }
 
