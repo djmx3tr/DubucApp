@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/api_service.dart';
 import 'services/notification_service.dart';
+import 'services/unified_notification_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/scanner_screen.dart';
 import 'screens/alerts_screen.dart';
@@ -12,7 +13,7 @@ void main() {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ApiService()),
-        ChangeNotifierProvider(create: (_) => AlertService()),
+        ChangeNotifierProvider(create: (_) => UnifiedNotificationService()),
       ],
       child: const DubucApp(),
     ),
@@ -58,7 +59,7 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation> with WidgetsBindingObserver {
   int _selectedIndex = 0;
 
   final List<Widget> _screens = [
@@ -69,11 +70,56 @@ class _MainNavigationState extends State<MainNavigation> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Déconnecter WebSocket proprement
+    context.read<UnifiedNotificationService>().disconnectWebSocket();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    final notificationService = context.read<UnifiedNotificationService>();
+    
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        // App en background ou fermée - déconnecter WebSocket
+        notificationService.disconnectWebSocket();
+        debugPrint('App en background - WebSocket déconnecté');
+        break;
+        
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.inactive:
+        // App active ou en avant-plan - reconnecter si nécessaire
+        if (!notificationService.isWebSocketConnected) {
+          notificationService.reconnectWebSocket();
+          debugPrint('App active - WebSocket reconnexion');
+        }
+        break;
+        
+      case AppLifecycleState.hidden:
+        // App cachée - déconnecter pour économiser la batterie
+        notificationService.disconnectWebSocket();
+        debugPrint('App cachée - WebSocket déconnecté');
+        break;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_selectedIndex],
-      bottomNavigationBar: Consumer<AlertService>(
-        builder: (context, alertService, child) {
+      bottomNavigationBar: Consumer<UnifiedNotificationService>(
+        builder: (context, unifiedService, child) {
           return NavigationBar(
             selectedIndex: _selectedIndex,
             onDestinationSelected: (index) {
@@ -94,13 +140,13 @@ class _MainNavigationState extends State<MainNavigation> {
               ),
               NavigationDestination(
                 icon: Badge(
-                  isLabelVisible: alertService.unreadCount > 0,
-                  label: Text('${alertService.unreadCount}'),
+                  isLabelVisible: unifiedService.unreadCount > 0,
+                  label: Text('${unifiedService.unreadCount}'),
                   child: const Icon(Icons.notifications_outlined),
                 ),
                 selectedIcon: Badge(
-                  isLabelVisible: alertService.unreadCount > 0,
-                  label: Text('${alertService.unreadCount}'),
+                  isLabelVisible: unifiedService.unreadCount > 0,
+                  label: Text('${unifiedService.unreadCount}'),
                   child: const Icon(Icons.notifications),
                 ),
                 label: 'Alertes',
