@@ -32,17 +32,18 @@ jobs:
 
       - name: Generate Android project and configure
         run: |
-          # Sauvegarder nos fichiers
-          cp -r lib lib_backup
-          cp pubspec.yaml pubspec_backup.yaml
+          # Créer le projet Flutter dans un répertoire temporaire
+          flutter create --org com.dubuc --project-name dubuc_app temp_app
           
-          # Générer le projet Flutter complet
-          flutter create --org com.dubuc --project-name dubuc_app .
+          # Copier nos fichiers dans le projet généré
+          cp -r lib/* temp_app/lib/
+          cp pubspec.yaml temp_app/
           
-          # Restaurer nos fichiers
-          rm -rf lib
-          mv lib_backup lib
-          mv pubspec_backup.yaml pubspec.yaml
+          # Déplacer le projet généré à la racine
+          rm -rf android
+          mv temp_app/android .
+          mv temp_app/pubspec.yaml .
+          rm -rf temp_app
 
           # === 1. Fix minSdkVersion (requis par mobile_scanner et permissions) ===
           sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle
@@ -60,7 +61,7 @@ jobs:
           }
           EOF
 
-          # === 3. Fix AndroidX compatibility pour flutter_local_notifications ===
+          # === 3. Fix AndroidX compatibility ===
           sed -i 's/androidx.core:core-ktx:.*/androidx.core:core-ktx:1.12.0/' android/app/build.gradle
           sed -i 's/com.google.android.material:material:.*/com.google.android.material:material:1.11.0/' android/app/build.gradle
 
