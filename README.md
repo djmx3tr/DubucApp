@@ -21,13 +21,13 @@ Application mobile pour la gestion des jobs de l'usine Dubuc & CO.
 
 - Flutter SDK 3.0+
 - Android SDK
-- Serveur API Dubuc (par défaut: `http://192.168.0.24:5000`)
+- Serveur API Dubuc
 
 ## Installation (Développement)
 
 ```bash
 # Cloner le repo
-git clone https://github.com/VOTRE_USERNAME/DubucApp.git
+git clone https://github.com/djmx3tr/DubucApp.git
 cd DubucApp
 
 # Installer les dépendances
@@ -60,7 +60,6 @@ L'APK sera dans `build/app/outputs/flutter-apk/`
 
 Au premier lancement, configurez l'URL du serveur dans **Paramètres**.
 
-URL par défaut: `http://192.168.0.24:5000`
 
 ## API Endpoints utilisés
 
