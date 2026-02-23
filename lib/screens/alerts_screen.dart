@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/notification_model.dart';
 import '../services/notification_service.dart';
 import '../services/unified_notification_service.dart';
 

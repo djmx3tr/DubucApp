@@ -68,7 +68,7 @@ class UnifiedNotificationService extends ChangeNotifier {
     _allNotifications.insert(0, notification);
     
     // Envoyer notification locale
-    _localNotifService.showNotification(
+    _localNotifService.showAutoNotification(
       title: notification.title,
       body: notification.body,
     );
@@ -100,7 +100,7 @@ class UnifiedNotificationService extends ChangeNotifier {
     _detectionAlerts.insert(0, alert);
     
     // Envoyer notification locale
-    await _localNotifService.showNotification(
+    await _localNotifService.showAutoNotification(
       title: notification.title,
       body: notification.body,
     );

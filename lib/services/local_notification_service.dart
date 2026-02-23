@@ -1,5 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:permission_handler/permission_handler';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Service de gestion des notifications locales
 class NotificationService {
@@ -75,7 +75,7 @@ class NotificationService {
   }
 
   /// Affiche une notification avec ID automatique
-  Future<void> showNotification({
+  Future<void> showAutoNotification({
     required String title,
     required String body,
   }) async {
