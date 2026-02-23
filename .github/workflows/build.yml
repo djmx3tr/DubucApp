@@ -44,7 +44,7 @@ jobs:
           mv lib_backup lib
           mv pubspec_backup.yaml pubspec.yaml
 
-          # === 1. Fix minSdkVersion (requis par mobile_scanner) ===
+          # === 1. Fix minSdkVersion (requis par mobile_scanner et permissions) ===
           sed -i 's/minSdk = .*/minSdk = 21/' android/app/build.gradle
           sed -i 's/minSdkVersion .*/minSdkVersion 21/' android/app/build.gradle
 
@@ -60,7 +60,11 @@ jobs:
           }
           EOF
 
-          # === 3. Permissions et config AndroidManifest ===
+          # === 3. Fix AndroidX compatibility pour flutter_local_notifications ===
+          sed -i 's/androidx.core:core-ktx:.*/androidx.core:core-ktx:1.12.0/' android/app/build.gradle
+          sed -i 's/com.google.android.material:material:.*/com.google.android.material:material:1.11.0/' android/app/build.gradle
+
+          # === 4. Permissions et config AndroidManifest ===
           cat > android/app/src/main/AndroidManifest.xml << 'MANIFEST'
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <!-- Permissions pour les notifications et réseau -->
@@ -114,10 +118,15 @@ jobs:
           </manifest>
           MANIFEST
 
-          echo "=== DONE: Android project configured ==="
+          echo "=== Configuration Android terminée ==="
           
       - name: Get dependencies
-        run: flutter pub get
+        run: |
+          echo "=== Installation des dépendances ==="
+          flutter pub get
+          echo "=== Vérification des dépendances ==="
+          flutter doctor -v
+          echo "=== Dépendances installées avec succès ==="
 
       - name: Build APK (Release)
         run: flutter build apk --release
